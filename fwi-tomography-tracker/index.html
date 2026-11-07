@@ -1,0 +1,1080 @@
+<title>لوحة FWI وTomography</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Noto+Kufi+Arabic:wght@600;700&display=swap">
+<style>
+/* Layout: sticky project bar + tab strip; each tab is one working view (overview, stages, QC matrix, evidence, actions, risks, log). Weekly-review density, RTL. */
+:root{
+  --bg:#eef1f4; --surface:#ffffff; --surface-2:#f6f8fa; --ink:#13202b; --muted:#5a6976; --line:#d6dee5; --line-2:#e7ecf0;
+  --accent:#1d4fb8; --accent-soft:#e4ebfa; --today:#c23a2b;
+  --ok:#1b7a45; --ok-soft:#e1f2e8; --warn:#a86a12; --warn-soft:#f8eed9; --bad:#b8321f; --bad-soft:#f9e3df;
+  --info:#6a48c0; --info-soft:#ece6f8; --idle:#7b8794; --idle-soft:#eceff2;
+  --f-display:"Noto Kufi Arabic","IBM Plex Sans Arabic",Tahoma,sans-serif;
+  --f-body:"IBM Plex Sans Arabic","Segoe UI",Tahoma,Arial,sans-serif;
+  --f-data:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  --r:8px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e151c; --surface:#151f29; --surface-2:#1a2631; --ink:#e3eaf0; --muted:#96a5b2; --line:#2a3a48; --line-2:#22303c;
+  --accent:#7ea2f0; --accent-soft:#1c2c4a; --today:#f07a6a;
+  --ok:#5fc58b; --ok-soft:#173226; --warn:#e0aa52; --warn-soft:#33281a; --bad:#f08573; --bad-soft:#3a1f1b;
+  --info:#b49cf2; --info-soft:#2a2342; --idle:#8d9aa6; --idle-soft:#222d37; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e151c; --surface:#151f29; --surface-2:#1a2631; --ink:#e3eaf0; --muted:#96a5b2; --line:#2a3a48; --line-2:#22303c;
+  --accent:#7ea2f0; --accent-soft:#1c2c4a; --today:#f07a6a;
+  --ok:#5fc58b; --ok-soft:#173226; --warn:#e0aa52; --warn-soft:#33281a; --bad:#f08573; --bad-soft:#3a1f1b;
+  --info:#b49cf2; --info-soft:#2a2342; --idle:#8d9aa6; --idle-soft:#222d37; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:14px/1.65 var(--f-body);direction:rtl}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+.wrap{max-width:1280px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{text-wrap:balance;margin:0}
+h1{font:700 1.35rem/1.35 var(--f-display)}
+h2{font:600 1.08rem/1.4 var(--f-body)}
+h3{font:600 .95rem/1.4 var(--f-body)}
+.num,.mono{font-family:var(--f-data);font-variant-numeric:tabular-nums;direction:ltr;unicode-bidi:isolate}
+.muted{color:var(--muted)}
+.small{font-size:.82rem}
+.eyebrow{font-size:.72rem;letter-spacing:.04em;color:var(--muted);font-weight:600}
+a{color:var(--accent)}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* top bar */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;padding-block:12px 0}
+.titleblock{flex:1 1 320px;min-width:0}
+.meta{display:flex;flex-wrap:wrap;gap:4px 14px;color:var(--muted);font-size:.8rem}
+.meta b{color:var(--ink);font-weight:500}
+.actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:.85rem;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--accent);padding:4px 6px}
+.btn.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.sync{font-size:.75rem;display:inline-flex;align-items:center;gap:6px;color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--idle);display:inline-block;flex:none}
+.sync.live .dot{background:var(--ok)} .sync.warn .dot{background:var(--warn)} .sync.err .dot{background:var(--bad)}
+.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:thin;flex-basis:100%;margin-top:4px}
+.tabs a{padding:9px 12px;text-decoration:none;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap;font-weight:500;font-size:.88rem}
+.tabs a[aria-current="page"]{color:var(--ink);border-bottom-color:var(--accent)}
+.tabs .cnt{font-family:var(--f-data);font-size:.72rem;background:var(--idle-soft);border-radius:9px;padding:0 6px;margin-inline-start:4px}
+
+main{padding-block:18px 60px}
+.view{display:grid;gap:16px}
+.banner{border:1px dashed var(--warn);background:var(--warn-soft);border-radius:var(--r);padding:10px 14px;display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.banner.info{border-color:var(--accent);background:var(--accent-soft)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;min-width:0}
+.panel-h{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 12px;margin-bottom:12px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px}
+
+/* KPI strip */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.kpi{background:var(--surface);padding:12px 14px;display:grid;gap:2px;align-content:start}
+.kpi .v{font:500 1.55rem/1.2 var(--f-data);font-variant-numeric:tabular-nums;direction:ltr;text-align:right}
+.kpi .v small{font-size:.8rem;color:var(--muted)}
+.kpi.bad .v{color:var(--bad)} .kpi.warn .v{color:var(--warn)} .kpi.ok .v{color:var(--ok)}
+
+/* pills */
+.pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:1px 9px;font-size:.75rem;font-weight:500;white-space:nowrap;border:1px solid transparent}
+.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.s-done,.q-pass,.d-approved,.st-closed{color:var(--ok);background:var(--ok-soft)}
+.s-in_progress,.st-in_progress{color:var(--accent);background:var(--accent-soft)}
+.s-review,.q-watch,.d-deferred{color:var(--warn);background:var(--warn-soft)}
+.s-on_hold,.q-fail,.d-rejected{color:var(--bad);background:var(--bad-soft)}
+.s-not_started,.q-pending,.st-open,.d-pending{color:var(--idle);background:var(--idle-soft)}
+.q-na{color:var(--muted);background:transparent;border-color:var(--line-2)}
+.st-open{color:var(--warn);background:var(--warn-soft)}
+
+/* evidence classes: color + form */
+.ev{display:inline-flex;align-items:center;gap:5px;font-size:.74rem;font-weight:600;padding:1px 8px;border-radius:4px;white-space:nowrap}
+.ev-proven{color:var(--ok);background:var(--ok-soft);border:1px solid var(--ok)}
+.ev-conditional{color:var(--warn);background:var(--warn-soft);border:1px solid var(--warn)}
+.ev-unconfirmed{color:var(--bad);background:transparent;border:1px dashed var(--bad)}
+.ev-research{color:var(--info);background:var(--info-soft);border:1px dotted var(--info)}
+.ev-mark{width:9px;height:9px;border:1.5px solid currentColor;border-radius:2px;flex:none}
+.ev-proven .ev-mark{background:currentColor}
+.ev-conditional .ev-mark{background:linear-gradient(90deg,currentColor 50%,transparent 50%)}
+.ev-unconfirmed .ev-mark{border-style:dashed}
+.ev-research .ev-mark{border-radius:50%;border-style:dotted}
+
+.src{display:inline-flex;gap:4px;align-items:center;font-size:.74rem;color:var(--muted);max-width:100%;min-width:0}
+.src .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:28ch}
+.src.missing{color:var(--bad)}
+.type{font-size:.72rem;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 6px;white-space:nowrap}
+
+/* gantt */
+.gantt{display:grid;gap:6px;min-width:620px}
+.gscroll{overflow-x:auto}
+.grow{display:grid;grid-template-columns:150px 1fr 74px;gap:10px;align-items:center}
+.glabel{font-weight:600;font-size:.86rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gtrack{position:relative;height:30px;background:var(--surface-2);border-radius:4px}
+.gaxis{position:relative;height:20px}
+.gtick{position:absolute;top:0;font:400 .7rem var(--f-data);color:var(--muted);transform:translateX(50%);white-space:nowrap}
+.gline{position:absolute;top:0;bottom:0;width:1px;background:var(--line-2)}
+.gbase{position:absolute;top:4px;height:8px;border:1.5px solid var(--muted);border-radius:3px;background:transparent}
+.gfc{position:absolute;top:15px;height:11px;border-radius:3px;background:var(--accent-soft);overflow:hidden;border:1px solid var(--accent)}
+.gfc i{position:absolute;inset-block:0;right:0;background:var(--accent)}
+.gfc.late{border-color:var(--bad);background:var(--bad-soft)} .gfc.late i{background:var(--bad)}
+.gtoday{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--today);z-index:1}
+.gslip{font:500 .78rem var(--f-data);text-align:left;direction:ltr}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.76rem;color:var(--muted);align-items:center}
+.legend span{display:inline-flex;gap:6px;align-items:center}
+.lg{display:inline-block;width:22px;height:8px;border-radius:2px}
+
+/* tables */
+.tscroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.85rem}
+th,td{padding:8px 10px;border-bottom:1px solid var(--line-2);text-align:right;vertical-align:top}
+th{font-size:.74rem;color:var(--muted);font-weight:600;background:var(--surface-2);white-space:nowrap}
+td.dt{white-space:nowrap}
+td .src{white-space:nowrap}
+td.n{font-family:var(--f-data);font-variant-numeric:tabular-nums;direction:ltr;text-align:left;white-space:nowrap}
+tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)}
+.delta-neg{color:var(--bad)} .delta-pos{color:var(--ok)}
+
+/* progress bar plan vs actual */
+.pbar{position:relative;height:10px;background:var(--surface-2);border:1px solid var(--line);border-radius:5px;overflow:visible}
+.pbar i{position:absolute;inset-block:0;right:0;background:var(--accent);border-radius:4px}
+.pbar b{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink)}
+.pbar.late i{background:var(--bad)}
+
+/* stage cards */
+.stage{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);min-width:0}
+.stage>summary{list-style:none;cursor:pointer;padding:14px 16px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 16px;align-items:center}
+.stage>summary::-webkit-details-marker{display:none}
+.stage[open]>summary{border-bottom:1px solid var(--line-2)}
+.sname{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+.sname .idx{font:500 .78rem var(--f-data);color:var(--muted)}
+.ssum{display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.ssum .pct{font:500 1.05rem var(--f-data);direction:ltr}
+.sbody{padding:14px 16px;display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr))}
+.block{display:grid;gap:8px;align-content:start;min-width:0}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:.84rem}
+.kv dt{color:var(--muted)} .kv dd{margin:0;min-width:0}
+.checks{display:grid;gap:4px;margin:0;padding:0;list-style:none}
+.checks label{display:flex;gap:8px;align-items:flex-start;font-size:.85rem;cursor:pointer;padding:3px 0}
+.checks input{margin-top:5px;accent-color:var(--accent)}
+.checks .done{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--line)}
+.inline{display:flex;flex-wrap:wrap;gap:8px;align-items:end}
+.inline label{display:grid;gap:2px;font-size:.74rem;color:var(--muted)}
+.inline input,.inline select{border:1px solid var(--line);background:var(--surface);border-radius:5px;padding:4px 8px;font-size:.85rem;min-width:0}
+.inline input[type=number]{width:80px;font-family:var(--f-data)}
+.next{border-inline-start:3px solid var(--accent);background:var(--accent-soft);padding:8px 12px;border-radius:0 6px 6px 0;font-size:.88rem}
+.minirow{display:flex;flex-wrap:wrap;gap:6px}
+
+/* QC matrix */
+.qct{min-width:760px}
+.qct td.cell{padding:6px;cursor:pointer;min-width:120px}
+.qcell{border-radius:6px;padding:6px 8px;display:grid;gap:2px;border:1px solid transparent;min-height:54px}
+.qcell .val{font:500 .78rem var(--f-data);direction:ltr;text-align:right;color:var(--ink)}
+.qcell.q-pass{border-color:var(--ok)} .qcell.q-fail{border-color:var(--bad)} .qcell.q-watch{border-color:var(--warn)}
+.qcell.q-pending{border:1px dashed var(--line)} .qcell.q-na{background:repeating-linear-gradient(135deg,transparent 0 6px,var(--line-2) 6px 7px)}
+.qcell:hover{outline:1px solid var(--accent)}
+.defs{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:12px}
+.def{border-top:2px solid var(--line);padding-top:8px;font-size:.84rem}
+
+/* evidence board */
+.board{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,270px),1fr));gap:12px}
+.col{display:grid;gap:8px;align-content:start;min-width:0}
+.colh{display:flex;justify-content:space-between;align-items:center;padding-bottom:6px;border-bottom:2px solid var(--line)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px 12px;display:grid;gap:6px;cursor:pointer;min-width:0}
+.card:hover{border-color:var(--accent)}
+.card .t{font-weight:600;font-size:.88rem}
+.card .d{font-size:.82rem;color:var(--muted);overflow-wrap:anywhere}
+.card .cond{font-size:.8rem;border-inline-start:2px solid var(--warn);padding-inline-start:8px}
+.card .foot{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+.empty{border:1px dashed var(--line);border-radius:6px;padding:14px;color:var(--muted);font-size:.84rem;text-align:center}
+
+/* filters */
+.filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.filters select,.filters input{border:1px solid var(--line);background:var(--surface);border-radius:5px;padding:5px 8px;font-size:.84rem}
+
+/* risk heat */
+.heat{display:grid;grid-template-columns:auto repeat(3,1fr);gap:4px;max-width:420px;font-size:.75rem}
+.heat .h{color:var(--muted);text-align:center;align-self:center}
+.heat .c{aspect-ratio:1.6;border-radius:5px;display:grid;place-items:center;font:500 1rem var(--f-data);max-width:100%}
+.heat .c.s1{background:var(--ok-soft);color:var(--ok)} .heat .c.s2{background:var(--warn-soft);color:var(--warn)} .heat .c.s3{background:var(--bad-soft);color:var(--bad)}
+
+/* dependency chain */
+.chain{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.node{border:1px solid var(--line);border-radius:6px;padding:6px 10px;background:var(--surface);display:grid;gap:2px;min-width:118px}
+.node .n1{font-weight:600;font-size:.84rem}
+.node.blocked{border-color:var(--bad);border-style:dashed}
+.arrow{color:var(--muted);font-size:1.1rem}
+
+/* log */
+.log{display:grid;gap:0}
+.logi{display:grid;grid-template-columns:120px 1fr;gap:12px;padding:8px 0;border-bottom:1px solid var(--line-2);font-size:.85rem}
+.logi .when{font:400 .76rem var(--f-data);color:var(--muted);direction:ltr;text-align:right}
+.chg{font-size:.82rem;unicode-bidi:isolate;color:var(--muted)}
+
+/* attention list */
+.att{display:grid;gap:6px;margin:0;padding:0;list-style:none}
+.att li{display:grid;grid-template-columns:4px 1fr;gap:10px;font-size:.86rem;cursor:pointer}
+.att li::before{content:"";border-radius:2px;background:var(--warn)}
+.att li.bad::before{background:var(--bad)} .att li.info::before{background:var(--info)}
+
+/* dialog */
+dialog{border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);padding:0;width:min(640px,calc(100vw - 24px));max-height:calc(100vh - 40px)}
+dialog::backdrop{background:rgba(10,18,26,.45)}
+.dlg-h{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line-2);gap:10px}
+.dlg-b{padding:14px 16px;display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));overflow:auto;max-height:calc(100vh - 170px)}
+.dlg-f{padding:12px 16px;border-top:1px solid var(--line-2);display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap}
+.field{display:grid;gap:4px;font-size:.78rem;color:var(--muted);min-width:0}
+.field.full{grid-column:1/-1}
+.field input,.field select,.field textarea{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:7px 9px;font-size:.88rem;color:var(--ink);width:100%}
+.field textarea{min-height:70px;resize:vertical}
+.field .hint{font-size:.72rem}
+.err{color:var(--bad);font-size:.82rem}
+
+/* meeting mode */
+body.meeting{font-size:15.5px}
+body.meeting .edit-only{display:none!important}
+.toast{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom,0px));left:max(16px,env(safe-area-inset-left,0px));background:var(--ink);color:var(--surface);padding:8px 14px;border-radius:6px;font-size:.85rem;z-index:20}
+
+@media (max-width:640px){
+  .grow{grid-template-columns:96px 1fr 56px;gap:6px}
+  .stage>summary{grid-template-columns:1fr}
+  .ssum{justify-content:flex-start}
+  .logi{grid-template-columns:1fr;gap:2px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="titleblock">
+      <div class="eyebrow">لوحة متابعة المعالجة · Velocity Model Building &amp; Imaging</div>
+      <h1 id="pname">مشروع FWI / Tomography</h1>
+      <div class="meta" id="pmeta"></div>
+    </div>
+    <div class="actions">
+      <span class="sync" id="sync"><span class="dot"></span><span id="synct">جارٍ الاتصال بقاعدة البيانات…</span></span>
+      <button class="btn" id="bMeeting" type="button" aria-pressed="false">وضع اجتماع JV</button>
+      <button class="btn edit-only" id="bProject" type="button">إعدادات المشروع</button>
+      <button class="btn primary edit-only" id="bAdd" type="button">+ إضافة عنصر</button>
+    </div>
+    <nav class="tabs" id="tabs" aria-label="أقسام اللوحة"></nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div id="banners" class="view" style="margin-bottom:16px"></div>
+  <section id="view" class="view" aria-live="polite"></section>
+</main>
+
+<dialog id="dlg"><form id="dlgForm" method="dialog"></form></dialog>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(() => {
+"use strict";
+
+/* ---------------- static vocabulary ---------------- */
+const STAGES = [
+  {key:"demultiple", name:"Demultiple", ar:"إزالة المضاعفات (SRME / Radon / Model-based)"},
+  {key:"regularization", name:"Regularization", ar:"تنظيم البيانات وإعادة البناء (Binning / 5D interpolation)"},
+  {key:"vmb", name:"VMB", ar:"بناء نموذج السرعة الابتدائي (Initial model + Anisotropy)"},
+  {key:"tomography", name:"Tomography", ar:"Reflection tomography وتحديث السرعة والـAnisotropy"},
+  {key:"fwi", name:"FWI", ar:"Full Waveform Inversion بالتدرج الترددي"},
+  {key:"migration", name:"Final Migration", ar:"التصوير النهائي (RTM / Kirchhoff / LSM) والمخرجات"},
+];
+const SKEY = Object.fromEntries(STAGES.map((s,i)=>[s.key,{...s,i}]));
+
+const STATUS = {not_started:"لم تبدأ", in_progress:"قيد التنفيذ", review:"قيد المراجعة", done:"مكتملة", on_hold:"متوقفة"};
+const QCS = {pass:"مقبول", watch:"مراقبة", fail:"غير مقبول", pending:"بانتظار النتائج", na:"لا ينطبق"};
+const EVID = {
+  proven:{l:"نتيجة مثبتة", d:"مدعومة بنتائج QC أو بيانات مسلّمة ومراجَعة"},
+  conditional:{l:"تقدير مشروط", d:"صحيحة فقط إذا تحقق شرط محدد"},
+  unconfirmed:{l:"تحتاج تأكيدًا", d:"منقولة أو شفهية ولم يُتحقق منها"},
+  research:{l:"مدخل بحثي جديد", d:"منهجية أو ورقة أو تجربة لم تُعتمد بعد"},
+};
+const TYPES = {
+  finding:{l:"معلومة / نتيجة", st:{open:"قيد التحقق", closed:"معتمدة"}},
+  decision:{l:"قرار", st:{pending:"بانتظار القرار", approved:"معتمد", rejected:"مرفوض", deferred:"مؤجل"}},
+  question:{l:"سؤال مفتوح", st:{open:"مفتوح", in_progress:"قيد البحث", closed:"أُجيب"}},
+  gap:{l:"عنصر غير مكتمل", st:{open:"ناقص", in_progress:"قيد الاستكمال", closed:"مكتمل"}},
+  risk:{l:"خطر", st:{open:"قائم", in_progress:"قيد المعالجة", closed:"مغلق"}},
+  dependency:{l:"تبعية خارجية", st:{open:"بانتظار", in_progress:"جزئي", closed:"متاحة"}},
+  action:{l:"إجراء / خطوة تالية", st:{open:"مفتوح", in_progress:"قيد التنفيذ", closed:"منجز"}},
+};
+const OPEN_ST = new Set(["open","in_progress","pending","deferred"]);
+
+const QC = [
+  {key:"misfit", name:"Data Misfit", what:"انخفاض Normalized misfit لكل Frequency band، ومطابقة Observed مع Synthetic shots.", tgt:"انخفاض متتابع لكل band، بلا Cycle skipping في الـOffsets البعيدة."},
+  {key:"cig", name:"CIG Flatness", what:"Residual moveout على Common Image Gathers بعد الـmigration.", tgt:"Gathers مستوية ضمن تسامح متفق عليه (ms أو m) حتى الـOffset المستهدف."},
+  {key:"velocity", name:"Velocity Validation", what:"مقارنة النموذج مع Sonic وCheckshot وVSP والاتجاه الإقليمي.", tgt:"الفروق ضمن نسبة متفق عليها، بلا انحراف منهجي مع العمق."},
+  {key:"welltie", name:"Well Tie", what:"Depth mis-tie عند الـMarkers ومعامل Correlation للـSynthetic seismogram.", tgt:"Mis-tie ضمن تسامح الآبار المعتمد لكل Marker رئيسي."},
+  {key:"structure", name:"Structural Preservation", what:"الحفاظ على الـFaults والاستمرارية والسعات، وغياب الـArtifacts مقارنة بالمرجع.", tgt:"لا تشوّه بنيوي ولا Footprint، والفروق مفسَّرة جيولوجيًا."},
+];
+const QCK = Object.fromEntries(QC.map(q=>[q.key,q]));
+const QC_DEFAULT_NA = {
+  demultiple:["misfit","velocity","welltie"], regularization:["misfit","velocity","welltie"],
+  vmb:["misfit","structure"], tomography:["misfit"], fwi:[], migration:["misfit"],
+};
+
+/* reusable review templates, one per stage */
+const REVIEW = {
+  demultiple:{focus:"حماية الـPrimaries وإزالة المضاعفات عند مستوى الهدف دون فقدان الترددات المنخفضة اللازمة لـFWI.", checks:[
+    "مراجعة Difference sections وgathers: لا Primary energy في الفرق",
+    "Residual multiples عند مستوى الهدف على Stack وAngle gathers",
+    "الحفاظ على AVO وسلوك السعات",
+    "الحفاظ على المحتوى منخفض التردد (< 5 Hz) للبيانات المستخدمة في FWI",
+    "اختبار المعاملات على خطوط تمثيلية قبل التطبيق الكامل",
+    "توثيق الـFlow والمعاملات النهائية"]},
+  regularization:{focus:"تغطية Offset/Azimuth متسقة دون Aliasing أو Footprint يضلل الـTomography.", checks:[
+    "خرائط Fold وتغطية Offset/Azimuth قبل وبعد",
+    "لا Aliasing أو Artifacts من الـ5D interpolation",
+    "Time slices خالية من Acquisition footprint",
+    "اتساق السعات بين الـTraces الأصلية والمعاد بناؤها",
+    "إعادة بناء الـNear offsets ومراجعتها",
+    "توثيق ما يُستخدم في Tomography مقابل ما يُستخدم في FWI"]},
+  vmb:{focus:"نموذج ابتدائي قريب بما يكفي لتجنب Cycle skipping في FWI.", checks:[
+    "دمج Sonic / Checkshot / VSP ومعايرة الاتجاه مع العمق",
+    "Horizons موجِّهة ومراجعة الأجسام عالية التباين (Salt / Carbonates / Volcanics)",
+    "Anisotropy ابتدائية (ε, δ) مبنية على الآبار وموثقة",
+    "اختبار Cycle skipping: خطأ زمن الانتقال أقل من نصف الدورة عند أدنى تردد",
+    "Smoothness مناسبة كنموذج بداية",
+    "مقارنة مع النموذج الإقليمي أو السابق"]},
+  tomography:{focus:"تسطيح الـCIGs وتقليل الـDepth residual عند الآبار عبر تحديثات مستقرة.", checks:[
+    "QC للـRMO picks: الكثافة والجودة واستبعاد الضوضاء",
+    "تحسن CIG flatness في كل Iteration",
+    "Ray coverage كافٍ في نطاق الهدف",
+    "مراجعة معاملات الـRegularization والـSmoothing",
+    "اتساق تحديث الـAnisotropy مع الآبار",
+    "معيار التوقف (Convergence) موثق ومتفق عليه"]},
+  fwi:{focus:"تقليل الـMisfit مع نموذج جيولوجي معقول ومتسق مع الآبار.", checks:[
+    "التردد الابتدائي وجدول Frequency continuation معتمدان",
+    "فحص Cycle skipping (Phase / Traveltime) قبل كل band",
+    "انخفاض Data misfit لكل band بلا Overfitting",
+    "Gradient خالٍ من Acquisition footprint وArtifacts المصدر",
+    "تقدير Source wavelet وتوثيقه",
+    "التحديثات معقولة جيولوجيًا ومتسقة مع الآبار",
+    "أقصى تردد تم الوصول إليه مقابل المستهدف"]},
+  migration:{focus:"صورة نهائية مستوية الـGathers ومرتبطة بالآبار وتحافظ على البنية.", checks:[
+    "اختيار الخوارزمية (RTM / Kirchhoff / LSM) والـAperture موثقان",
+    "CIG flatness على النموذج النهائي",
+    "Well tie وDepth mis-tie عند الـMarkers الرئيسية",
+    "Structural preservation مقارنة بالمسح المرجعي أو السابق",
+    "Artifacts وضوضاء الـMigration ضمن المقبول",
+    "قائمة المخرجات (Gathers / Stacks / Angle stacks / Models) مكتملة"]},
+};
+
+/* ---------------- state ---------------- */
+const S = {
+  db:null, user:null, canWrite:false, readOnly:false, demo:false, meeting:false,
+  meta:{}, stages:{}, qc:{}, reviews:{}, items:{}, log:[],
+  loaded:{meta:false,stages:false,qc:false,reviews:false,items:false,log:false},
+  people:{}, filter:{stage:"", type:"", status:"open", q:""}, since:"",
+};
+const views = [
+  ["overview","نظرة عامة"],["stages","المراحل والمراجعة"],["qc","مصفوفة QC"],
+  ["evidence","الأدلة والمصادر"],["actions","القرارات والأسئلة"],["risks","المخاطر والتبعيات"],["log","سجل التغييرات"],
+];
+
+/* ---------------- utils ---------------- */
+const $ = s => document.querySelector(s);
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const DAY = 864e5;
+const todayISO = () => { const d=new Date(); return new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10); };
+const pd = s => s ? new Date(s+"T00:00:00") : null;
+const iso = d => new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+const addDays = (d,n) => new Date(d.getTime()+n*DAY);
+let FMT, FMTS;
+try { FMT = new Intl.DateTimeFormat("ar-u-nu-latn",{day:"numeric",month:"short",year:"numeric"}); FMTS = new Intl.DateTimeFormat("ar-u-nu-latn",{month:"short",year:"2-digit"}); }
+catch { FMT = {format:d=>iso(d)}; FMTS = {format:d=>iso(d).slice(0,7)}; }
+const fd = s => s ? FMT.format(pd(s)) : "—";
+const fdt = ms => { try { return new Intl.DateTimeFormat("ar-u-nu-latn",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}).format(new Date(ms)); } catch { return new Date(ms).toISOString().slice(0,16); } };
+const daysBetween = (a,b) => Math.round((pd(b)-pd(a))/DAY);
+const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
+const num = v => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>t.hidden=true,2600); }
+
+/* ---------------- derived ---------------- */
+function stage(key){
+  const base = SKEY[key];
+  const d = S.stages[key] || {};
+  return {key, name:base.name, ar:base.ar, i:base.i, weight:1, actualPct:0, status:"not_started", depends:[], ...d};
+}
+function stageList(){ return STAGES.map(s=>stage(s.key)); }
+function plannedPct(st, at){
+  if(!st.planStart || !st.planEnd) return null;
+  const a=pd(st.planStart), b=pd(st.planEnd), t=pd(at||todayISO());
+  if(b<=a) return t>=b?100:0;
+  return clamp((t-a)/(b-a)*100,0,100);
+}
+function slipDays(st){
+  if(!st.planEnd) return null;
+  const end = st.status==="done" && st.actualEnd ? st.actualEnd : (st.fcEnd || null);
+  return end ? daysBetween(st.planEnd, end) : null;
+}
+function overall(){
+  const list = stageList(); let w=0, a=0, p=0, pw=0;
+  for(const s of list){ const wt=num(s.weight)||0; w+=wt; a+=wt*num(s.actualPct); const pl=plannedPct(s); if(pl!==null){ p+=wt*pl; pw+=wt; } }
+  return {actual: w? a/w : 0, planned: pw? p/pw : null, hasPlan: pw>0};
+}
+function qcCell(stageKey, m){
+  const id = stageKey+"__"+m;
+  const d = S.qc[id];
+  if(d) return {id, ...d};
+  return {id, stage:stageKey, metric:m, status:(QC_DEFAULT_NA[stageKey]||[]).includes(m)?"na":"pending"};
+}
+function itemsArr(){ return Object.entries(S.items).map(([id,d])=>({id,...d})); }
+const isOpen = it => OPEN_ST.has(it.status || "open");
+const riskScore = it => num(it.likelihood||0)*num(it.impact||0);
+function isOverdue(it){ return it.due && isOpen(it) && it.due < todayISO(); }
+
+function nextSuggestion(){
+  const list = stageList();
+  for(const s of list){
+    if(s.status==="done") continue;
+    const blockers = (s.depends||[]).filter(k=>stage(k).status!=="done");
+    const fails = QC.filter(q=>qcCell(s.key,q.key).status==="fail").map(q=>q.name);
+    const rv = S.reviews[s.key]||{};
+    const openGaps = itemsArr().filter(it=>it.stage===s.key && isOpen(it) && (it.type==="gap"||it.type==="decision"));
+    let why=[], what;
+    if(fails.length){ what=`معالجة QC غير المقبول في ${s.name}: ${fails.join("، ")}`; why.push("خلية QC بحالة غير مقبول"); }
+    else if(rv.verdict==="rework"){ what=`إعادة العمل على ${s.name} حسب ملاحظات المراجعة`; why.push("حكم المراجعة: إعادة عمل"); }
+    else if(openGaps.some(g=>g.type==="decision")){ const g=openGaps.find(g=>g.type==="decision"); what=`حسم القرار: ${g.title}`; why.push("قرار معلّق يوقف التقدم"); }
+    else if(s.nextStep){ what=s.nextStep; why.push("الخطوة المسجلة للمرحلة"); }
+    else { what = s.status==="not_started" ? `بدء ${s.name} بعد اعتماد المدخلات` : `استكمال قائمة مراجعة ${s.name}`; why.push("اقتراح تلقائي من قالب المراجعة"); }
+    if(blockers.length) why.push("تعتمد على: "+blockers.map(k=>SKEY[k].name).join("، "));
+    return {stage:s, what, why};
+  }
+  return null;
+}
+
+/* ---------------- demo data (never written) ---------------- */
+function demoData(){
+  const t = new Date(); const D = n => iso(addDays(t,n));
+  const st = {
+    demultiple:{planStart:D(-120),planEnd:D(-70),fcStart:D(-118),fcEnd:D(-62),actualEnd:D(-62),actualPct:100,status:"done",owner:"فريق المعالجة",nextStep:"",source:"تقرير المقاول الأسبوعي (مثال)",sourceDate:D(-60),weight:1},
+    regularization:{planStart:D(-75),planEnd:D(-40),fcStart:D(-64),fcEnd:D(-30),actualEnd:D(-30),actualPct:100,status:"done",owner:"فريق المعالجة",source:"محضر مراجعة QC (مثال)",sourceDate:D(-28),weight:1,depends:["demultiple"]},
+    vmb:{planStart:D(-45),planEnd:D(-20),fcStart:D(-35),fcEnd:D(-6),actualPct:90,status:"review",owner:"فريق السرعات",nextStep:"اعتماد ε و δ من بئرين إضافيين",source:"عرض المقاول (مثال)",sourceDate:D(-5),weight:1,depends:["regularization"]},
+    tomography:{planStart:D(-20),planEnd:D(25),fcStart:D(-8),fcEnd:D(41),actualPct:30,status:"in_progress",owner:"فريق السرعات",nextStep:"تشغيل Iteration 2 بعد تنظيف RMO picks",source:"تقرير التقدم (مثال)",sourceDate:D(-3),weight:1.5,depends:["vmb"]},
+    fwi:{planStart:D(20),planEnd:D(80),fcStart:D(38),fcEnd:D(98),actualPct:5,status:"not_started",owner:"فريق FWI",nextStep:"تجهيز Low-frequency data QC",source:"خطة المشروع (مثال)",sourceDate:D(-90),weight:2,depends:["tomography"]},
+    migration:{planStart:D(80),planEnd:D(110),fcStart:D(98),fcEnd:D(128),actualPct:0,status:"not_started",owner:"فريق التصوير",source:"خطة المشروع (مثال)",sourceDate:D(-90),weight:1,depends:["fwi"]},
+  };
+  const qc = {
+    "demultiple__cig":{status:"pass",value:"RMO residual ↓",source:"محضر QC (مثال)"},
+    "demultiple__structure":{status:"pass",value:"no primary damage",source:"Difference plots (مثال)"},
+    "regularization__structure":{status:"watch",value:"footprint @ 1.2 s",source:"Time slices (مثال)"},
+    "regularization__cig":{status:"pass",value:"",source:"(مثال)"},
+    "vmb__velocity":{status:"pass",value:"Δv ≈ 2%",source:"Checkshots (مثال)"},
+    "vmb__welltie":{status:"watch",value:"mis-tie 25 m",source:"Well W-2 (مثال)"},
+    "vmb__cig":{status:"watch",value:"",source:"(مثال)"},
+    "tomography__cig":{status:"fail",value:"RMO 18 ms far",source:"Iteration 1 QC (مثال)"},
+    "tomography__velocity":{status:"pending"}, "tomography__welltie":{status:"pending"}, "tomography__structure":{status:"pass",value:"",source:"(مثال)"},
+  };
+  const items = {
+    e1:{type:"finding",evidence:"proven",title:"Demultiple لم يُضعف الـPrimaries عند مستوى الهدف",detail:"Difference sections على ثلاثة خطوط تمثيلية.",stage:"demultiple",status:"closed",source:"محضر QC (مثال)",sourceDate:D(-60)},
+    e2:{type:"finding",evidence:"conditional",title:"FWI يمكن أن يبدأ من 3 Hz",condition:"إذا أكد QC أن نسبة الإشارة للضوضاء تحت 4 Hz مقبولة على الـOffsets البعيدة",stage:"fwi",status:"open",source:"تقدير المقاول (مثال)",sourceDate:D(-10)},
+    e3:{type:"finding",evidence:"unconfirmed",title:"الشريك سيسلّم VSP البئر W-3 قبل نهاية الشهر",stage:"vmb",status:"open",source:"حديث شفهي في اجتماع (مثال)",sourceDate:D(-7)},
+    e4:{type:"finding",evidence:"research",title:"تجربة Adaptive / Optimal-transport misfit لتقليل Cycle skipping",detail:"تُقيَّم على خط اختبار واحد قبل أي اعتماد.",stage:"fwi",status:"open",source:"ورقة بحثية (مثال)",sourceDate:D(-14)},
+    d1:{type:"decision",title:"اعتماد نموذج Anisotropy: VTI أم TTI",stage:"tomography",status:"pending",owner:"لجنة JV",due:D(5),evidence:"conditional",source:"(مثال)"},
+    q1:{type:"question",title:"هل نطاق 2–3 Hz متاح فعليًا في البيانات الخام؟",stage:"fwi",status:"open",owner:"فريق FWI",due:D(12),source:"(مثال)"},
+    g1:{type:"gap",title:"Checkshots البئر W-4 غير مستلمة",stage:"vmb",status:"open",owner:"إدارة البيانات",due:D(-2),source:"قائمة البيانات (مثال)"},
+    r1:{type:"risk",title:"Cycle skipping في المنطقة العميقة",stage:"fwi",status:"open",likelihood:2,impact:3,mitigation:"Tomography إضافية + بدء FWI بتردد أدنى",owner:"فريق FWI",source:"تحليل المخاطر (مثال)"},
+    r2:{type:"risk",title:"تأخر Tomography يدفع FWI إلى ما بعد نافذة الحوسبة المحجوزة",stage:"tomography",status:"open",likelihood:3,impact:2,mitigation:"إعادة حجز ساعات HPC",owner:"مدير المشروع",source:"(مثال)"},
+    p1:{type:"dependency",title:"موافقة الشريك على حجم ساعات HPC",stage:"fwi",status:"open",owner:"JV",due:D(14),source:"(مثال)"},
+    a1:{type:"action",title:"تنظيف RMO picks وإعادة Iteration 2",stage:"tomography",status:"in_progress",owner:"فريق السرعات",due:D(7),source:"(مثال)"},
+  };
+  const reviews = {demultiple:{checks:{0:true,1:true,2:true,3:true,4:true,5:true},verdict:"accepted"},regularization:{checks:{0:true,1:true,2:true,3:true},verdict:"conditional"},vmb:{checks:{0:true,1:true,2:true},verdict:"pending"},tomography:{checks:{0:true},verdict:"pending"}};
+  const log = [
+    {at:Date.now()-2*DAY,entity:"stage",ref:"tomography",field:"actualPct",from:"20",to:"30",text:"تحديث نسبة Tomography"},
+    {at:Date.now()-3*DAY,entity:"qc",ref:"tomography__cig",field:"status",from:"pending",to:"fail",text:"CIG Flatness — Tomography"},
+    {at:Date.now()-5*DAY,entity:"stage",ref:"vmb",field:"fcEnd",from:D(-12),to:D(-6),text:"تأجيل نهاية VMB"},
+  ];
+  return {meta:{name:"مثال توضيحي — مشروع FWI / Tomography",baselineLabel:"Baseline v1 (مثال)",reviewDate:todayISO(),nextMeeting:D(7),lastMeeting:D(-7),partners:"Operator / Partner A (مثال)"},stages:st,qc,items,reviews,log};
+}
+let REAL = null;
+function setDemo(on){
+  if(on && !S.demo){ REAL = {meta:S.meta,stages:S.stages,qc:S.qc,items:S.items,reviews:S.reviews,log:S.log}; Object.assign(S, demoData()); S.demo=true; }
+  else if(!on && S.demo){ Object.assign(S, REAL||{}); S.demo=false; }
+  S.since = S.meta.lastMeeting || "";
+  renderAll();
+}
+function isEmptyStore(){ return !Object.values(S.stages).some(s=>s.planStart||s.fcStart||num(s.actualPct)>0) && !Object.keys(S.items).length; }
+
+/* ---------------- writes ---------------- */
+const canEdit = () => S.canWrite && !S.readOnly && !S.demo;
+async function who(){ try { return S.user ? await S.user.id() : null; } catch { return null; } }
+async function writeDoc(path, existing, patch){
+  if(!canEdit()) { toast(S.demo?"وضع المثال للعرض فقط":"لا تملك صلاحية التعديل"); return false; }
+  const by = await who();
+  const body = {...patch, updatedAt:Date.now(), ...(by?{updatedBy:by}:{})};
+  try {
+    const ref = S.db.doc(path);
+    if(existing) await ref.update(body); else await ref.set(body);
+    return true;
+  } catch(e){
+    if(e && e.code==="invalid_argument"){ S.readOnly=true; renderBanners(); toast("تعذر الحفظ: الصفحة للقراءة فقط لك"); }
+    else if(e && e.code==="quota_exceeded"){ toast("امتلأت قاعدة البيانات: احذف عناصر قديمة من السجل"); }
+    else toast("تعذر الحفظ، حاول مرة أخرى");
+    return false;
+  }
+}
+async function addLog(entry){
+  if(!canEdit()) return;
+  const by = await who();
+  try { await S.db.collection("log").add({at:Date.now(), ...(by?{by}:{}), ...entry}); } catch {}
+}
+const FIELD_L = {actualPct:"نسبة الإنجاز",status:"الحالة",planStart:"بداية الخطة",planEnd:"نهاية الخطة",fcStart:"البداية الفعلية",fcEnd:"النهاية المتوقعة",actualEnd:"النهاية الفعلية",owner:"المسؤول",nextStep:"الخطوة التالية",weight:"الوزن",verdict:"حكم المراجعة",value:"القيمة"};
+async function saveStage(key, patch){
+  const cur = S.stages[key];
+  const old = stage(key);
+  const ok = await writeDoc("stages/"+key, !!cur, cur ? patch : {name:SKEY[key].name, order:SKEY[key].i, ...stage(key), ...patch});
+  if(!ok) return;
+  for(const f of Object.keys(patch)){
+    if(["source","sourceDate","notes","depends"].includes(f)) continue;
+    if(String(old[f]??"")!==String(patch[f]??"")) await addLog({entity:"stage",ref:key,field:f,from:String(old[f]??""),to:String(patch[f]??""),text:`${SKEY[key].name}: ${FIELD_L[f]||f}`});
+  }
+  toast("حُفظ");
+}
+
+/* ---------------- rendering helpers ---------------- */
+const pill = (cls, label) => `<span class="pill ${cls}">${esc(label)}</span>`;
+const stPill = s => pill("s-"+s, STATUS[s]||s);
+const qcPill = s => pill("q-"+s, QCS[s]||s);
+const evTag = e => e && EVID[e] ? `<span class="ev ev-${e}" title="${esc(EVID[e].d)}"><span class="ev-mark"></span>${esc(EVID[e].l)}</span>` : "";
+function itemStatusPill(it){
+  const t = TYPES[it.type]||TYPES.finding; const s = it.status || Object.keys(t.st)[0];
+  const cls = s==="approved"||s==="closed" ? "st-closed" : s==="rejected" ? "d-rejected" : s==="in_progress" ? "st-in_progress" : s==="deferred" ? "d-deferred" : "st-open";
+  return pill(cls, t.st[s]||s);
+}
+function srcChip(o){
+  if(!o || !o.source) return `<span class="src missing" title="سجّل مصدر هذه المعلومة">⚠ بدون مصدر</span>`;
+  const isUrl = /^https?:\/\//.test(o.sourceRef||"");
+  const t = `<span class="t">${esc(o.source)}</span>${o.sourceDate?` · <span>${esc(fd(o.sourceDate))}</span>`:""}`;
+  return isUrl ? `<a class="src" href="${esc(o.sourceRef)}" target="_blank" rel="noopener" title="${esc(o.source)}">المصدر: ${t} ↗</a>` : `<span class="src" title="${esc(o.source)}${o.sourceRef?" — "+esc(o.sourceRef):""}">المصدر: ${t}</span>`;
+}
+const pct = v => `${Math.round(num(v))}<small>%</small>`;
+function delta(v, unit="pp"){ if(v===null||v===undefined||!Number.isFinite(v)) return "—"; const r=Math.round(v); const cls=r<0?"delta-neg":r>0?"delta-pos":""; return `<span class="${cls} num">${r>0?"+":""}${r} ${unit}</span>`; }
+function slipHtml(d){ if(d===null) return `<span class="muted">—</span>`; const cls = d>0?"delta-neg":d<0?"delta-pos":""; return `<span class="${cls}"><span class="num">${d>0?"+":""}${d}</span> يوم</span>`; }
+function pbar(actual, planned){
+  const late = planned!==null && actual < planned-5;
+  return `<div class="pbar ${late?"late":""}" role="img" aria-label="فعلي ${Math.round(actual)}% مقابل مخطط ${planned===null?"—":Math.round(planned)+"%"}"><i style="width:${clamp(actual,0,100)}%"></i>${planned!==null?`<b style="right:calc(${clamp(planned,0,100)}% - 1px)" title="المخطط حسب خط الأساس"></b>`:""}</div>`;
+}
+
+/* ---------------- top / tabs / banners ---------------- */
+function currentView(){ const h=(location.hash||"").slice(1); return views.some(v=>v[0]===h)?h:"overview"; }
+function renderTabs(){
+  const cur=currentView(); const its=itemsArr();
+  const counts = {
+    actions: its.filter(i=>["decision","question","gap","action"].includes(i.type)&&isOpen(i)).length,
+    risks: its.filter(i=>(i.type==="risk"||i.type==="dependency")&&isOpen(i)).length,
+    evidence: its.filter(i=>i.evidence).length,
+    qc: Object.keys(SKEY).reduce((n,k)=>n+QC.filter(q=>qcCell(k,q.key).status==="fail").length,0),
+  };
+  $("#tabs").innerHTML = views.map(([id,l])=>`<a href="#${id}" ${id===cur?'aria-current="page"':""}>${esc(l)}${counts[id]?`<span class="cnt">${counts[id]}</span>`:""}</a>`).join("");
+}
+function renderHeader(){
+  const m=S.meta;
+  $("#pname").textContent = m.name || "مشروع FWI / Tomography";
+  const parts = [];
+  parts.push(`تاريخ المراجعة: <b>${esc(fd(m.reviewDate||todayISO()))}</b>`);
+  if(m.nextMeeting) parts.push(`اجتماع JV القادم: <b>${esc(fd(m.nextMeeting))}</b>`);
+  parts.push(`خط الأساس: <b>${esc(m.baselineLabel||"الخطة الأصلية")}</b>`);
+  if(m.partners) parts.push(`الشركاء: <b>${esc(m.partners)}</b>`);
+  if(m.contractor) parts.push(`المقاول: <b>${esc(m.contractor)}</b>`);
+  $("#pmeta").innerHTML = parts.map(p=>`<span>${p}</span>`).join("");
+  $("#bMeeting").classList.toggle("on", S.meeting); $("#bMeeting").setAttribute("aria-pressed", String(S.meeting));
+  $("#bAdd").disabled = !canEdit(); $("#bProject").disabled = !canEdit();
+}
+function renderBanners(){
+  const b=[];
+  if(S.demo) b.push(`<div class="banner"><b>بيانات توضيحية</b><span>هذه أرقام مثال لعرض طريقة عمل اللوحة، وليست بيانات مشروعك. التعديل معطّل في هذا الوضع.</span><button class="btn" type="button" data-act="demo-off">العودة إلى بيانات المشروع</button></div>`);
+  else if(S.loaded.stages && S.loaded.items && isEmptyStore()) b.push(`<div class="banner info"><span>لم تُسجَّل تواريخ أو نسب بعد. ابدأ من تبويب <a href="#stages">المراحل والمراجعة</a> بإدخال الخطة الأصلية (Baseline) ثم النسب الفعلية، أو اعرض مثالًا لترى اللوحة مكتملة.</span><button class="btn" type="button" data-act="demo-on">عرض مثال توضيحي</button></div>`);
+  if(!S.db && S.dbChecked) b.push(`<div class="banner"><span>قاعدة البيانات غير متاحة في هذا العرض (غير مسجّل الدخول أو غير مسموح). تُعرض اللوحة للقراءة فقط.</span>${S.demo?"":`<button class="btn" type="button" data-act="demo-on">عرض مثال توضيحي</button>`}</div>`);
+  else if(S.readOnly && !S.demo) b.push(`<div class="banner"><span>لديك صلاحية عرض فقط. اطلب من المالك صلاحية Contributor لتحديث النسب والتواريخ.</span></div>`);
+  if(S.slow) b.push(`<div class="banner"><span>تعذر الوصول إلى البيانات حتى الآن؛ ما يظهر قد لا يكون محدّثًا.</span></div>`);
+  $("#banners").innerHTML = b.join(""); $("#banners").hidden = !b.length;
+}
+
+/* ---------------- views ---------------- */
+function vOverview(){
+  const o=overall(), list=stageList(), its=itemsArr();
+  const slips = list.map(s=>({s,d:slipDays(s)})).filter(x=>x.d!==null).sort((a,b)=>b.d-a.d);
+  const worst = slips[0];
+  const pendingDec = its.filter(i=>i.type==="decision"&&isOpen(i));
+  const openQ = its.filter(i=>i.type==="question"&&isOpen(i));
+  const highRisk = its.filter(i=>i.type==="risk"&&isOpen(i)&&riskScore(i)>=6);
+  const qcFail = []; list.forEach(s=>QC.forEach(q=>{ const c=qcCell(s.key,q.key); if(c.status==="fail") qcFail.push({s,q,c}); }));
+  const noSrc = its.filter(i=>!i.source).length + list.filter(s=>(s.planStart||num(s.actualPct)>0)&&!s.source).length;
+  const dlt = o.planned===null?null:o.actual-o.planned;
+  const nx = nextSuggestion();
+
+  const kpis = `<div class="kpis">
+    <div class="kpi"><span class="eyebrow">الإنجاز الفعلي (موزون)</span><span class="v">${pct(o.actual)}</span></div>
+    <div class="kpi"><span class="eyebrow">المخطط حسب خط الأساس</span><span class="v">${o.planned===null?"—":pct(o.planned)}</span></div>
+    <div class="kpi ${dlt!==null&&dlt<-5?"bad":dlt!==null&&dlt<0?"warn":"ok"}"><span class="eyebrow">الفرق عن الخطة</span><span class="v">${dlt===null?"—":`${dlt>0?"+":""}${Math.round(dlt)}<small> pp</small>`}</span></div>
+    <div class="kpi ${worst&&worst.d>14?"bad":worst&&worst.d>0?"warn":""}"><span class="eyebrow">أكبر انزلاق${worst?` · ${esc(worst.s.name)}`:""}</span><span class="v">${worst?`${worst.d>0?"+":""}${worst.d}<small> يوم</small>`:"—"}</span></div>
+    <div class="kpi ${pendingDec.length?"warn":""}"><span class="eyebrow">قرارات معلقة</span><span class="v">${pendingDec.length}</span></div>
+    <div class="kpi"><span class="eyebrow">أسئلة مفتوحة</span><span class="v">${openQ.length}</span></div>
+    <div class="kpi ${highRisk.length?"bad":""}"><span class="eyebrow">مخاطر عالية (L×I ≥ 6)</span><span class="v">${highRisk.length}</span></div>
+    <div class="kpi ${qcFail.length?"bad":""}"><span class="eyebrow">خلايا QC غير مقبولة</span><span class="v">${qcFail.length}</span></div>
+  </div>`;
+
+  const next = nx ? `<div class="panel"><div class="panel-h"><h2>الخطوة التالية المقترحة</h2><span class="muted small">مستنتجة من الحالة وQC والقرارات والتبعيات</span></div>
+    <div class="next"><b>${esc(nx.stage.name)}:</b> ${esc(nx.what)}</div>
+    <div class="minirow" style="margin-top:8px">${nx.why.map(w=>`<span class="type">${esc(w)}</span>`).join("")}</div></div>`
+    : `<div class="panel"><h2>الخطوة التالية المقترحة</h2><p class="muted">كل المراحل مكتملة.</p></div>`;
+
+  // attention list
+  const att=[];
+  qcFail.forEach(x=>att.push({cls:"bad",t:`QC غير مقبول: ${x.q.name} في ${x.s.name}${x.c.value?` (${x.c.value})`:""}`,act:`qc:${x.c.id}`}));
+  its.filter(isOverdue).forEach(i=>att.push({cls:"bad",t:`متأخر عن موعده (${fd(i.due)}): ${i.title}`,act:`item:${i.id}`}));
+  highRisk.forEach(i=>att.push({cls:"bad",t:`خطر عالٍ: ${i.title}`,act:`item:${i.id}`}));
+  pendingDec.forEach(i=>att.push({cls:"",t:`قرار مطلوب${i.due?` قبل ${fd(i.due)}`:""}: ${i.title}`,act:`item:${i.id}`}));
+  its.filter(i=>i.evidence==="unconfirmed"&&isOpen(i)).forEach(i=>att.push({cls:"info",t:`تحتاج تأكيدًا: ${i.title}`,act:`item:${i.id}`}));
+  if(noSrc) att.push({cls:"",t:`${noSrc} معلومة بدون مصدر مسجّل`,act:"go:evidence"});
+  const attention = `<div class="panel"><div class="panel-h"><h2>يحتاج انتباه الاجتماع</h2><span class="muted small">${att.length} بند</span></div>
+    ${att.length?`<ul class="att">${att.slice(0,12).map(a=>`<li class="${a.cls}" data-act="${esc(a.act)}" tabindex="0">${esc(a.t)}</li>`).join("")}</ul>`:`<div class="empty">لا توجد بنود حرجة.</div>`}</div>`;
+
+  // evidence summary
+  const evc = Object.keys(EVID).map(k=>[k, its.filter(i=>i.evidence===k).length]);
+  const evid = `<div class="panel"><div class="panel-h"><h2>تصنيف المعلومات</h2><a href="#evidence" class="small">عرض اللوحة</a></div>
+    <div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr))">${evc.map(([k,n])=>`<div class="kpi"><span>${evTag(k)}</span><span class="v">${n}</span></div>`).join("")}</div></div>`;
+
+  // changes since
+  const since = S.since || S.meta.lastMeeting || "";
+  const sinceMs = since ? pd(since).getTime() : 0;
+  const ch = S.log.filter(l=>l.at>=sinceMs).slice(0,8);
+  const changes = `<div class="panel"><div class="panel-h"><h2>ما الذي تغيّر منذ</h2>
+     <span class="inline"><label for="sinceIn" class="small">التاريخ</label><input id="sinceIn" type="date" value="${esc(since)}"></span></div>
+     ${ch.length?`<div class="log">${ch.map(logRow).join("")}</div>${S.log.filter(l=>l.at>=sinceMs).length>8?`<a href="#log" class="small">كل التغييرات</a>`:""}`:`<div class="empty">لا تغييرات مسجّلة منذ هذا التاريخ.</div>`}</div>`;
+
+  return kpis + `<div class="grid2">${next}${attention}</div>` + vGantt() + vPlanTable() + `<div class="grid2">${evid}${changes}</div>`;
+}
+
+function vGantt(){
+  const list=stageList();
+  const dates=[]; list.forEach(s=>["planStart","planEnd","fcStart","fcEnd","actualEnd"].forEach(f=>s[f]&&dates.push(pd(s[f]).getTime())));
+  if(!dates.length) return `<div class="panel"><div class="panel-h"><h2>الجدول الزمني: الخطة الأصلية مقابل المتوقع</h2></div><div class="empty">أدخل تواريخ الخطة الأصلية والمتوقعة لكل مرحلة لعرض الجدول الزمني.</div></div>`;
+  const now=pd(todayISO()).getTime(); dates.push(now);
+  let a=Math.min(...dates), b=Math.max(...dates); const pad=(b-a)*.04||15*DAY; a-=pad; b+=pad;
+  const X = t => ((t-a)/(b-a)*100);
+  const ticks=[]; const d0=new Date(a); d0.setDate(1); d0.setMonth(d0.getMonth()+1);
+  const span=(b-a)/DAY; const step = span>540?3:span>270?2:1;
+  for(let d=new Date(d0); d.getTime()<b; d.setMonth(d.getMonth()+step)) ticks.push(d.getTime());
+  const lines = ticks.map(t=>`<span class="gline" style="right:${X(t)}%"></span>`).join("");
+  const rows = list.map(s=>{
+    const base = s.planStart&&s.planEnd ? `<span class="gbase" style="right:${X(pd(s.planStart).getTime())}%;width:${Math.max(.6,X(pd(s.planEnd).getTime())-X(pd(s.planStart).getTime()))}%" title="الخطة الأصلية: ${esc(fd(s.planStart))} ← ${esc(fd(s.planEnd))}"></span>`:"";
+    const fs = s.fcStart||s.planStart, fe = (s.status==="done"&&s.actualEnd)||s.fcEnd||s.planEnd;
+    const sl = slipDays(s);
+    const fc = fs&&fe ? `<span class="gfc ${sl!==null&&sl>0?"late":""}" style="right:${X(pd(fs).getTime())}%;width:${Math.max(.6,X(pd(fe).getTime())-X(pd(fs).getTime()))}%" title="الفعلي/المتوقع: ${esc(fd(fs))} ← ${esc(fd(fe))} · ${Math.round(num(s.actualPct))}%"><i style="width:${clamp(num(s.actualPct),0,100)}%"></i></span>`:"";
+    return `<div class="grow"><span class="glabel" title="${esc(s.ar)}">${esc(s.name)}</span><div class="gtrack">${lines}${base}${fc}<span class="gtoday" style="right:${X(now)}%"></span></div><span class="gslip">${sl===null?"—":`${sl>0?"+":""}${sl}d`}</span></div>`;
+  }).join("");
+  const axis = `<div class="grow"><span></span><div class="gaxis">${ticks.map(t=>`<span class="gtick" style="right:${X(t)}%">${esc(FMTS.format(new Date(t)))}</span>`).join("")}</div><span class="gslip muted small">انزلاق</span></div>`;
+  return `<div class="panel"><div class="panel-h"><h2>الجدول الزمني: الخطة الأصلية مقابل المتوقع</h2>
+    <div class="legend"><span><i class="lg" style="border:1.5px solid var(--muted)"></i>الخطة الأصلية</span><span><i class="lg" style="background:var(--accent)"></i>الإنجاز ضمن المتوقع</span><span><i class="lg" style="background:var(--bad-soft);border:1px solid var(--bad)"></i>متأخر عن الخطة</span><span><i class="lg" style="width:2px;height:12px;background:var(--today)"></i>اليوم</span></div></div>
+    <div class="gscroll"><div class="gantt">${axis}${rows}</div></div></div>`;
+}
+
+function vPlanTable(){
+  const list=stageList();
+  return `<div class="panel"><div class="panel-h"><h2>المقارنة مع الخطة الأصلية</h2><span class="muted small">الوزن يحدد مساهمة كل مرحلة في الإنجاز الكلي</span></div>
+  <div class="tscroll"><table><thead><tr><th>المرحلة</th><th>الحالة</th><th>بداية / نهاية الخطة</th><th>بداية فعلية / نهاية متوقعة</th><th>الانزلاق</th><th>المخطط</th><th>الفعلي</th><th>الفرق</th><th>الوزن</th><th>المصدر</th></tr></thead><tbody>
+  ${list.map(s=>{ const p=plannedPct(s); const a=num(s.actualPct);
+    return `<tr class="click" data-act="stage:${s.key}"><td><b>${esc(s.name)}</b></td><td>${stPill(s.status)}</td>
+    <td class="dt">${esc(fd(s.planStart))} ← ${esc(fd(s.planEnd))}</td><td class="dt">${esc(fd(s.fcStart))} ← ${esc(fd(s.status==="done"&&s.actualEnd?s.actualEnd:s.fcEnd))}</td>
+    <td class="n">${slipHtml(slipDays(s))}</td><td class="n">${p===null?"—":Math.round(p)+"%"}</td><td class="n">${Math.round(a)}%</td><td class="n">${p===null?"—":delta(a-p)}</td><td class="n">${esc(s.weight)}</td><td>${srcChip(s)}</td></tr>`; }).join("")}
+  </tbody></table></div></div>`;
+}
+
+function vStages(){
+  const intro = `<div class="panel"><div class="panel-h"><h2>مراجعة المراحل</h2><span class="muted small">قالب مراجعة واحد يتكرر لكل مرحلة: الخطة مقابل الفعلي، قائمة الفحص، QC، العناصر المرتبطة، والخطوة التالية</span></div>
+    <div class="legend"><span><i class="lg" style="background:var(--accent)"></i>الفعلي</span><span><i class="lg" style="width:2px;height:12px;background:var(--ink)"></i>المخطط اليوم حسب خط الأساس</span></div></div>`;
+  return intro + stageList().map(stageCard).join("");
+}
+function stageCard(s){
+  const p=plannedPct(s), a=num(s.actualPct), sl=slipDays(s), tpl=REVIEW[s.key], rv=S.reviews[s.key]||{};
+  const checks=rv.checks||{}; const nDone=tpl.checks.filter((_,i)=>checks[i]).length;
+  const its=itemsArr().filter(i=>i.stage===s.key);
+  const openBy = t => its.filter(i=>i.type===t&&isOpen(i)).length;
+  const ed = canEdit();
+  const deps=(s.depends||[]).map(k=>`${esc(SKEY[k]?.name||k)} ${stPill(stage(k).status)}`).join(" ");
+  const verdicts={pending:"لم يُحسم",accepted:"مقبول",conditional:"مقبول بشروط",rework:"إعادة عمل"};
+  const vcls={pending:"s-not_started",accepted:"s-done",conditional:"s-review",rework:"s-on_hold"};
+  const open = sessionOpen.has(s.key);
+  return `<details class="stage" data-stage="${s.key}" ${open?"open":""}>
+  <summary>
+    <div class="sname"><span class="idx">${String(s.i+1).padStart(2,"0")}</span><h3>${esc(s.name)}</h3>${stPill(s.status)}<span class="muted small">${esc(s.ar)}</span></div>
+    <div class="ssum"><span class="small muted">مراجعة ${nDone}/${tpl.checks.length}</span>${pill(vcls[rv.verdict||"pending"],verdicts[rv.verdict||"pending"])}<span class="small">${slipHtml(sl)}</span><span class="pct">${Math.round(a)}%</span><div style="width:140px">${pbar(a,p)}</div></div>
+  </summary>
+  <div class="sbody">
+    <div class="block">
+      <span class="eyebrow">الخطة مقابل الفعلي</span>
+      <dl class="kv">
+        <dt>الخطة الأصلية</dt><dd>${esc(fd(s.planStart))} ← ${esc(fd(s.planEnd))}</dd>
+        <dt>الفعلي / المتوقع</dt><dd>${esc(fd(s.fcStart))} ← ${esc(fd(s.status==="done"&&s.actualEnd?s.actualEnd:s.fcEnd))}</dd>
+        <dt>المخطط اليوم</dt><dd class="num">${p===null?"—":Math.round(p)+"%"} · الفرق ${p===null?"—":delta(a-p)}</dd>
+        <dt>المسؤول</dt><dd>${esc(s.owner||"—")}</dd>
+        <dt>تعتمد على</dt><dd>${deps||"—"}</dd>
+        <dt>المصدر</dt><dd>${srcChip(s)}</dd>
+      </dl>
+      ${ed?`<div class="inline edit-only" data-stage-quick="${s.key}">
+        <label>النسبة %<input type="number" min="0" max="100" step="1" data-f="actualPct" value="${esc(Math.round(a))}" id="q-${s.key}-pct"></label>
+        <label>النهاية المتوقعة<input type="date" data-f="fcEnd" value="${esc(s.fcEnd||"")}" id="q-${s.key}-fc"></label>
+        <label>الحالة<select data-f="status" id="q-${s.key}-st">${Object.entries(STATUS).map(([k,l])=>`<option value="${k}" ${k===s.status?"selected":""}>${l}</option>`).join("")}</select></label>
+        <button class="btn" type="button" data-act="stage:${s.key}">تعديل كامل ومصدر</button>
+      </div>`:""}
+      ${s.notes?`<p class="small" style="margin:0">${esc(s.notes)}</p>`:""}
+    </div>
+    <div class="block">
+      <span class="eyebrow">قائمة مراجعة ${esc(s.name)}</span>
+      <p class="small muted" style="margin:0">${esc(tpl.focus)}</p>
+      <ul class="checks">${tpl.checks.map((c,i)=>`<li><label><input type="checkbox" data-check="${s.key}:${i}" id="c-${s.key}-${i}" ${checks[i]?"checked":""} ${ed?"":"disabled"}><span class="${checks[i]?"done":""}">${esc(c)}</span></label></li>`).join("")}</ul>
+      <div class="inline">
+        <label>حكم المراجعة<select data-verdict="${s.key}" id="v-${s.key}" ${ed?"":"disabled"}>${Object.entries(verdicts).map(([k,l])=>`<option value="${k}" ${k===(rv.verdict||"pending")?"selected":""}>${l}</option>`).join("")}</select></label>
+        ${rv.reviewDate?`<span class="small muted">آخر مراجعة <span>${esc(fd(rv.reviewDate))}</span></span>`:""}
+      </div>
+    </div>
+    <div class="block">
+      <span class="eyebrow">QC لهذه المرحلة</span>
+      <div class="minirow">${QC.map(q=>{ const c=qcCell(s.key,q.key); return `<button type="button" class="pill q-${c.status}" data-act="qc:${c.id}" title="${esc(q.what)}" style="cursor:pointer">${esc(q.name)}: ${esc(QCS[c.status])}</button>`; }).join("")}</div>
+      <span class="eyebrow" style="margin-top:6px">العناصر المرتبطة</span>
+      <div class="minirow">
+        ${[["decision","قرارات معلقة"],["question","أسئلة مفتوحة"],["gap","غير مكتمل"],["risk","مخاطر"],["dependency","تبعيات"]].map(([t,l])=>`<a class="type" href="#${t==="risk"||t==="dependency"?"risks":"actions"}" data-filter-stage="${s.key}">${l}: <span class="num">${openBy(t)}</span></a>`).join("")}
+      </div>
+      <span class="eyebrow" style="margin-top:6px">الخطوة التالية</span>
+      <div class="next">${esc(s.nextStep || "لم تُسجَّل خطوة تالية بعد.")}</div>
+      ${ed?`<div class="minirow edit-only"><button class="btn ghost" type="button" data-act="new:${s.key}">+ عنصر لهذه المرحلة</button></div>`:""}
+    </div>
+  </div></details>`;
+}
+const sessionOpen = new Set();
+
+function vQC(){
+  const list=stageList();
+  const head = `<tr><th>المرحلة</th>${QC.map(q=>`<th title="${esc(q.what)}">${esc(q.name)}</th>`).join("")}</tr>`;
+  const rows = list.map(s=>`<tr><td><b>${esc(s.name)}</b><div>${stPill(s.status)}</div></td>${QC.map(q=>{ const c=qcCell(s.key,q.key);
+    return `<td class="cell" data-act="qc:${c.id}" tabindex="0"><div class="qcell q-${c.status}">${qcPill(c.status)}${c.value?`<span class="val">${esc(c.value)}</span>`:""}${c.status!=="na"&&c.status!=="pending"?srcChip(c):""}</div></td>`; }).join("")}</tr>`).join("");
+  const tally = Object.keys(QCS).map(k=>{ let n=0; list.forEach(s=>QC.forEach(q=>{ if(qcCell(s.key,q.key).status===k) n++; })); return `<span>${qcPill(k)} <span class="num">${n}</span></span>`; }).join("");
+  return `<div class="panel"><div class="panel-h"><h2>مصفوفة QC</h2><div class="legend">${tally}</div></div>
+    <p class="small muted" style="margin-top:0">انقر أي خلية لتحديث الحالة والقيمة المقاسة ومعيار القبول والمصدر. الخلايا المخططة بخطوط مائلة لا تنطبق على المرحلة.</p>
+    <div class="tscroll"><table class="qct"><thead>${head}</thead><tbody>${rows}</tbody></table></div></div>
+    <div class="panel"><div class="panel-h"><h2>تعريف المعايير</h2><span class="muted small">معايير القبول المقترحة تُستبدل بالأرقام المتفق عليها في مشروعكم</span></div>
+    <div class="defs">${QC.map(q=>`<div class="def"><h3>${esc(q.name)}</h3><p style="margin:.3em 0">${esc(q.what)}</p><p class="small muted" style="margin:0"><b>معيار مقترح:</b> ${esc(q.tgt)}</p></div>`).join("")}</div></div>`;
+}
+
+function itemCard(it){
+  const t=TYPES[it.type]||TYPES.finding;
+  return `<div class="card" data-act="item:${esc(it.id)}" tabindex="0">
+    <div class="foot"><span class="type">${esc(t.l)}</span>${it.stage?`<span class="type">${esc(SKEY[it.stage]?.name||it.stage)}</span>`:""}${itemStatusPill(it)}</div>
+    <div class="t">${esc(it.title)}</div>
+    ${it.detail?`<div class="d">${esc(it.detail)}</div>`:""}
+    ${it.evidence==="conditional"&&it.condition?`<div class="cond"><b>الشرط:</b> ${esc(it.condition)}</div>`:""}
+    <div class="foot">${srcChip(it)}${it.owner?`<span class="small muted">${esc(it.owner)}</span>`:""}${it.due?`<span class="small ${isOverdue(it)?"delta-neg":"muted"}">${esc(fd(it.due))}</span>`:""}</div>
+  </div>`;
+}
+function filterBar(types){
+  const f=S.filter;
+  return `<div class="filters">
+    <select id="fStage" aria-label="المرحلة"><option value="">كل المراحل</option><option value="_general" ${f.stage==="_general"?"selected":""}>عام</option>${STAGES.map(s=>`<option value="${s.key}" ${f.stage===s.key?"selected":""}>${s.name}</option>`).join("")}</select>
+    ${types?`<select id="fType" aria-label="النوع"><option value="">كل الأنواع</option>${types.map(t=>`<option value="${t}" ${f.type===t?"selected":""}>${TYPES[t].l}</option>`).join("")}</select>`:""}
+    <select id="fStatus" aria-label="الحالة"><option value="open" ${f.status==="open"?"selected":""}>المفتوحة فقط</option><option value="" ${f.status===""?"selected":""}>الكل</option><option value="closed" ${f.status==="closed"?"selected":""}>المغلقة فقط</option></select>
+    <input id="fQ" type="search" placeholder="بحث في العناوين والمصادر" value="${esc(f.q)}" aria-label="بحث">
+  </div>`;
+}
+function applyFilter(arr){
+  const f=S.filter, q=f.q.trim().toLowerCase();
+  return arr.filter(i=> (!f.stage || (f.stage==="_general"? !i.stage : i.stage===f.stage))
+    && (!f.type || i.type===f.type)
+    && (!f.status || (f.status==="open"? isOpen(i) : !isOpen(i)))
+    && (!q || [i.title,i.detail,i.source,i.owner,i.condition].some(v=>String(v||"").toLowerCase().includes(q))));
+}
+
+function vEvidence(){
+  const all = applyFilter(itemsArr().filter(i=>i.evidence));
+  const unclassified = itemsArr().filter(i=>!i.evidence && i.type==="finding");
+  const cols = Object.entries(EVID).map(([k,e])=>{ const xs=all.filter(i=>i.evidence===k);
+    return `<div class="col"><div class="colh">${evTag(k)}<span class="num muted">${xs.length}</span></div><p class="small muted" style="margin:0">${esc(e.d)}</p>${xs.length?xs.map(itemCard).join(""):`<div class="empty">لا عناصر.</div>`}</div>`; }).join("");
+  return `<div class="panel"><div class="panel-h"><h2>الأدلة والمصادر</h2>${canEdit()?`<button class="btn edit-only" type="button" data-act="new-finding">+ معلومة جديدة</button>`:""}</div>
+    <p class="small muted" style="margin-top:0">كل معلومة تُصنَّف في فئة واحدة ويُسجَّل مصدرها وتاريخه. التقدير المشروط يُعرض مع شرطه. المعلومة بلا مصدر تظهر بعلامة تحذير.</p>
+    ${filterBar(Object.keys(TYPES))}</div>
+    <div class="board">${cols}</div>
+    ${unclassified.length?`<div class="panel"><h3>معلومات بلا تصنيف</h3><div class="board" style="margin-top:8px">${unclassified.map(itemCard).join("")}</div></div>`:""}`;
+}
+
+function itemTable(arr, cols){
+  if(!arr.length) return `<div class="empty">لا عناصر مطابقة.</div>`;
+  return `<div class="tscroll"><table><thead><tr><th>العنوان</th><th>المرحلة</th><th>الحالة</th>${cols.includes("ev")?"<th>التصنيف</th>":""}<th>المسؤول</th><th>الموعد</th>${cols.includes("risk")?"<th>L×I</th><th>المعالجة</th>":""}<th>المصدر</th></tr></thead><tbody>
+  ${arr.map(i=>`<tr class="click" data-act="item:${esc(i.id)}"><td><b>${esc(i.title)}</b>${i.detail?`<div class="small muted">${esc(i.detail)}</div>`:""}</td><td>${esc(i.stage?SKEY[i.stage]?.name:"عام")}</td><td>${itemStatusPill(i)}</td>${cols.includes("ev")?`<td>${evTag(i.evidence)||"—"}</td>`:""}<td>${esc(i.owner||"—")}</td><td class="dt ${isOverdue(i)?"delta-neg":""}">${esc(fd(i.due))}</td>${cols.includes("risk")?`<td class="n">${riskScore(i)||"—"}</td><td class="small">${esc(i.mitigation||"—")}</td>`:""}<td>${srcChip(i)}</td></tr>`).join("")}
+  </tbody></table></div>`;
+}
+function vActions(){
+  const sec = (t, title, sub) => { const xs=applyFilter(itemsArr().filter(i=>i.type===t)).sort((a,b)=>(a.due||"9")<(b.due||"9")?-1:1);
+    return `<div class="panel"><div class="panel-h"><h2>${title} <span class="num muted small">${xs.length}</span></h2>${canEdit()?`<button class="btn edit-only" type="button" data-act="new-type:${t}">+ ${TYPES[t].l}</button>`:""}</div>${sub?`<p class="small muted" style="margin-top:0">${sub}</p>`:""}${itemTable(xs,["ev"])}</div>`; };
+  return `<div class="panel">${filterBar(null)}</div>` + sec("decision","القرارات","القرارات المطلوبة من فريق المشروع أو من اجتماع JV، مع موعد الحسم.") + sec("question","الأسئلة المفتوحة","") + sec("gap","العناصر غير المكتملة","بيانات أو مخرجات أو توثيق ناقص يعطّل مرحلة.") + sec("action","الإجراءات والخطوات التالية","");
+}
+function vRisks(){
+  const rs = applyFilter(itemsArr().filter(i=>i.type==="risk"));
+  const grid = {}; rs.filter(isOpen).forEach(r=>{ const k=`${r.likelihood||0}-${r.impact||0}`; grid[k]=(grid[k]||0)+1; });
+  const lv=["منخفض","متوسط","مرتفع"];
+  let heat=`<div class="heat" role="table" aria-label="مصفوفة الاحتمال والأثر"><span></span>${[1,2,3].map(i=>`<span class="h">أثر ${lv[i-1]}</span>`).join("")}`;
+  for(let l=3;l>=1;l--){ heat+=`<span class="h">احتمال ${lv[l-1]}</span>`; for(let i=1;i<=3;i++){ const sc=l*i; heat+=`<span class="c ${sc>=6?"s3":sc>=3?"s2":"s1"}">${grid[`${l}-${i}`]||""}</span>`; } }
+  heat+=`</div>`;
+  const chain = `<div class="chain">${stageList().map((s,i)=>{ const blocked=(s.depends||[]).some(k=>stage(k).status!=="done") && s.status!=="not_started" && s.status!=="done";
+    return `${i?`<span class="arrow">←</span>`:""}<div class="node ${blocked?"blocked":""}" title="${blocked?"بدأت قبل اكتمال ما تعتمد عليه":""}"><span class="n1">${esc(s.name)}</span>${stPill(s.status)}</div>`; }).join("")}</div>`;
+  const deps = applyFilter(itemsArr().filter(i=>i.type==="dependency"));
+  return `<div class="panel">${filterBar(null)}</div>
+  <div class="grid2"><div class="panel"><div class="panel-h"><h2>مصفوفة المخاطر</h2><span class="muted small">عدد المخاطر القائمة في كل خلية</span></div>${heat}</div>
+  <div class="panel"><div class="panel-h"><h2>تسلسل التبعيات بين المراحل</h2></div>${chain}<p class="small muted">الإطار المتقطع: مرحلة بدأت قبل اكتمال المرحلة التي تعتمد عليها. عدّل التبعيات من "تعديل كامل" لكل مرحلة.</p></div></div>
+  <div class="panel"><div class="panel-h"><h2>سجل المخاطر <span class="num muted small">${rs.length}</span></h2>${canEdit()?`<button class="btn edit-only" type="button" data-act="new-type:risk">+ خطر</button>`:""}</div>${itemTable(rs.sort((a,b)=>riskScore(b)-riskScore(a)),["risk"])}</div>
+  <div class="panel"><div class="panel-h"><h2>التبعيات الخارجية <span class="num muted small">${deps.length}</span></h2>${canEdit()?`<button class="btn edit-only" type="button" data-act="new-type:dependency">+ تبعية</button>`:""}</div><p class="small muted" style="margin-top:0">بيانات أو موافقات أو موارد من الشريك أو المقاول أو HPC.</p>${itemTable(deps,["ev"])}</div>`;
+}
+function logRow(l){
+  const name = l.by && S.people[l.by] ? (S.people[l.by].name||"") : "";
+  const isQC = l.entity==="qc", f=l.field;
+  const fmtv = v => f==="status" ? (isQC?QCS[v]:STATUS[v]||TYPES[l.itype]?.st?.[v]||v) : /^\d{4}-\d\d-\d\d$/.test(v||"") ? fd(v) : f==="actualPct"? v+"%" : v;
+  const change = (l.from!==undefined||l.to!==undefined) && f ? `<span class="chg">${esc(fmtv(l.from)||"—")} ← ${esc(fmtv(l.to)||"—")}</span>` : "";
+  return `<div class="logi"><span class="when">${esc(fdt(l.at))}</span><span>${esc(l.text||"")} ${change} ${name?`<span class="small muted">· ${esc(name)}</span>`:""}</span></div>`;
+}
+function vLog(){
+  const since = S.since || "";
+  const sinceMs = since ? pd(since).getTime() : 0;
+  const xs = S.log.filter(l=>l.at>=sinceMs);
+  return `<div class="panel"><div class="panel-h"><h2>سجل التغييرات</h2><span class="inline"><label for="sinceIn2" class="small">منذ</label><input id="sinceIn2" type="date" value="${esc(since)}"></span></div>
+  <p class="small muted" style="margin-top:0">يُسجَّل تلقائيًا كل تغيير في النسب والتواريخ والحالات وQC. استخدمه في بداية الاجتماع الأسبوعي لمراجعة ما تغيّر منذ الاجتماع السابق.</p>
+  ${xs.length?`<div class="log">${xs.map(logRow).join("")}</div>`:`<div class="empty">لا تغييرات في هذه الفترة.</div>`}</div>`;
+}
+
+/* ---------------- render orchestration ---------------- */
+let pendingRender=false;
+function renderAll(){
+  const v=$("#view");
+  if(v.contains(document.activeElement) && document.activeElement.matches("input,select,textarea")){ pendingRender=true; return; }
+  pendingRender=false;
+  renderHeader(); renderTabs(); renderBanners();
+  const cur=currentView();
+  v.innerHTML = ({overview:vOverview,stages:vStages,qc:vQC,evidence:vEvidence,actions:vActions,risks:vRisks,log:vLog}[cur])();
+  document.body.classList.toggle("meeting", S.meeting);
+  resolvePeople();
+}
+document.addEventListener("focusout", ()=>{ setTimeout(()=>{ if(pendingRender) renderAll(); }, 50); });
+async function resolvePeople(){
+  if(!S.user || !S.user.profiles) return;
+  const ids=[...new Set(S.log.map(l=>l.by).filter(Boolean))].filter(id=>!S.people[id]);
+  if(!ids.length) return;
+  try { const ps=await S.user.profiles(ids); Object.assign(S.people, ps); if(currentView()==="log"||currentView()==="overview") renderAll(); } catch {}
+}
+
+/* ---------------- dialogs ---------------- */
+const dlg=$("#dlg"), form=$("#dlgForm");
+function field(id,label,html,cls=""){ return `<label class="field ${cls}" for="${id}">${label}${html}</label>`; }
+const inp = (id,v,type="text",extra="") => `<input id="${id}" name="${id}" type="${type}" value="${esc(v??"")}" ${extra}>`;
+const sel = (id,opts,v) => `<select id="${id}" name="${id}">${Object.entries(opts).map(([k,l])=>`<option value="${esc(k)}" ${String(k)===String(v??"")?"selected":""}>${esc(l)}</option>`).join("")}</select>`;
+const ta = (id,v,ph="") => `<textarea id="${id}" name="${id}" placeholder="${esc(ph)}">${esc(v??"")}</textarea>`;
+function srcFields(o){ return field("f_source","المصدر (تقرير، محضر، بريد، شخص)",inp("f_source",o.source,"text",'placeholder="مثال: تقرير المقاول الأسبوع 45"'))
+  + field("f_sourceDate","تاريخ المصدر",inp("f_sourceDate",o.sourceDate,"date"))
+  + field("f_sourceRef","مرجع أو رابط",inp("f_sourceRef",o.sourceRef,"text",'placeholder="رقم المستند أو رابط https://"'),"full"); }
+function openDialog(title, body, onSave, onDelete){
+  const ro = !canEdit();
+  form.innerHTML = `<div class="dlg-h"><h2>${esc(title)}</h2><button class="btn ghost" type="button" data-close aria-label="إغلاق">✕</button></div>
+    <div class="dlg-b">${body}</div>
+    <div class="dlg-f"><span>${onDelete&&!ro?`<button class="btn" type="button" data-del style="color:var(--bad)">حذف</button>`:""}<span class="err" id="dlgErr"></span></span>
+    <span class="actions"><button class="btn" type="button" data-close>${ro?"إغلاق":"إلغاء"}</button>${ro?"":`<button class="btn primary" type="submit">حفظ</button>`}</span></div>`;
+  if(ro) form.querySelectorAll("input,select,textarea").forEach(e=>e.disabled=true);
+  form.onsubmit = async ev => { ev.preventDefault(); if(ro) return; const fd=Object.fromEntries(new FormData(form).entries()); const r = await onSave(fd); if(r!==false) dlg.close(); };
+  form.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>dlg.close());
+  const del=form.querySelector("[data-del]");
+  if(del) del.onclick = async () => { if(del.dataset.armed){ await onDelete(); dlg.close(); } else { del.dataset.armed="1"; del.textContent="تأكيد الحذف"; } };
+  if(dlg.showModal) dlg.showModal(); else dlg.setAttribute("open","");
+}
+const g = (fd,k) => (fd["f_"+k]??"").trim();
+
+function editStage(key){
+  const s=stage(key);
+  const deps = STAGES.filter(x=>x.key!==key).map(x=>`<label style="display:flex;gap:6px;align-items:center;color:var(--ink)"><input type="checkbox" name="dep_${x.key}" ${ (s.depends||[]).includes(x.key)?"checked":""}> ${x.name}</label>`).join("");
+  const body = `<p class="small muted full" style="grid-column:1/-1;margin:0">${esc(s.ar)}</p>`
+    + field("f_planStart","بداية الخطة الأصلية (Baseline)",inp("f_planStart",s.planStart,"date"))
+    + field("f_planEnd","نهاية الخطة الأصلية (Baseline)",inp("f_planEnd",s.planEnd,"date"))
+    + field("f_fcStart","البداية الفعلية",inp("f_fcStart",s.fcStart,"date"))
+    + field("f_fcEnd","النهاية المتوقعة (Forecast)",inp("f_fcEnd",s.fcEnd,"date"))
+    + field("f_actualEnd","النهاية الفعلية (عند الاكتمال)",inp("f_actualEnd",s.actualEnd,"date"))
+    + field("f_actualPct","نسبة الإنجاز الفعلية %",inp("f_actualPct",Math.round(num(s.actualPct)),"number",'min="0" max="100"'))
+    + field("f_status","الحالة",sel("f_status",STATUS,s.status))
+    + field("f_weight","الوزن في الإنجاز الكلي",inp("f_weight",s.weight,"number",'min="0" step="0.5"'))
+    + field("f_owner","المسؤول",inp("f_owner",s.owner),"full")
+    + field("f_nextStep","الخطوة التالية",inp("f_nextStep",s.nextStep),"full")
+    + `<div class="field full">تعتمد على<div class="minirow">${deps}</div></div>`
+    + srcFields(s)
+    + field("f_notes","ملاحظات",ta("f_notes",s.notes),"full");
+  openDialog(`${s.name} — تحديث المرحلة`, body, async fd => {
+    const patch = {};
+    ["planStart","planEnd","fcStart","fcEnd","actualEnd","status","owner","nextStep","source","sourceDate","sourceRef","notes"].forEach(k=>patch[k]=g(fd,k));
+    patch.actualPct = clamp(num(g(fd,"actualPct")),0,100); patch.weight = Math.max(0,num(g(fd,"weight")||1));
+    patch.depends = STAGES.filter(x=>fd["dep_"+x.key]).map(x=>x.key);
+    if(patch.planStart&&patch.planEnd&&patch.planEnd<patch.planStart){ $("#dlgErr").textContent="نهاية الخطة قبل بدايتها."; return false; }
+    if(patch.status==="done" && patch.actualPct<100) patch.actualPct=100;
+    const changed = Object.fromEntries(Object.entries(patch).filter(([k,v])=>JSON.stringify(v)!==JSON.stringify(s[k]??(k==="depends"?[]:""))));
+    if(!Object.keys(changed).length) return;
+    await saveStage(key, changed);
+  });
+}
+function editQC(id){
+  const [sk,m]=id.split("__"); const c=qcCell(sk,m), q=QCK[m];
+  const body = `<div class="field full" style="color:var(--ink)"><b>${esc(SKEY[sk].name)} · ${esc(q.name)}</b><span class="muted">${esc(q.what)}</span></div>`
+    + field("f_status","الحالة",sel("f_status",QCS,c.status))
+    + field("f_value","القيمة المقاسة",inp("f_value",c.value,"text",'placeholder="مثال: RMO 8 ms @ 4 km · mis-tie 12 m"'))
+    + field("f_target","معيار القبول المتفق عليه",inp("f_target",c.target,"text",`placeholder="${esc(q.tgt)}"`),"full")
+    + srcFields(c)
+    + field("f_note","ملاحظة",ta("f_note",c.note),"full");
+  openDialog("تحديث QC", body, async fd => {
+    const patch={stage:sk, metric:m}; ["status","value","target","source","sourceDate","sourceRef","note"].forEach(k=>patch[k]=g(fd,k));
+    const ok = await writeDoc("qc/"+id, !!S.qc[id], patch); if(!ok) return false;
+    if(patch.status!==c.status) await addLog({entity:"qc",ref:id,field:"status",from:c.status,to:patch.status,text:`QC ${q.name} — ${SKEY[sk].name}`});
+    else if((patch.value||"")!==(c.value||"")) await addLog({entity:"qc",ref:id,field:"value",from:c.value||"",to:patch.value,text:`QC ${q.name} — ${SKEY[sk].name}`});
+    toast("حُفظ");
+  });
+}
+function editItem(id, preset={}){
+  const it = id ? {id, ...S.items[id]} : {type:"finding", status:"", evidence:"", ...preset};
+  const t = it.type;
+  const typeOpts = Object.fromEntries(Object.entries(TYPES).map(([k,v])=>[k,v.l]));
+  const evOpts = {"":"— بدون تصنيف —", ...Object.fromEntries(Object.entries(EVID).map(([k,v])=>[k,v.l]))};
+  const stOpts = {"":"عام (كل المشروع)", ...Object.fromEntries(STAGES.map(s=>[s.key,s.name]))};
+  const body = field("f_type","النوع",sel("f_type",typeOpts,t))
+    + field("f_stage","المرحلة",sel("f_stage",stOpts,it.stage||""))
+    + field("f_title","العنوان",inp("f_title",it.title,"text","required"),"full")
+    + field("f_detail","التفاصيل",ta("f_detail",it.detail),"full")
+    + field("f_evidence","تصنيف المعلومة",sel("f_evidence",evOpts,it.evidence||""))
+    + field("f_status","الحالة",`<select id="f_status" name="f_status"></select>`)
+    + field("f_condition","الشرط (للتقدير المشروط)",inp("f_condition",it.condition,"text",'placeholder="صحيح فقط إذا…"'),"full cond-f")
+    + field("f_owner","المسؤول",inp("f_owner",it.owner))
+    + field("f_due","الموعد",inp("f_due",it.due,"date"))
+    + field("f_likelihood","الاحتمال (1–3)",sel("f_likelihood",{"":"—",1:"1 منخفض",2:"2 متوسط",3:"3 مرتفع"},it.likelihood||""),"risk-f")
+    + field("f_impact","الأثر (1–3)",sel("f_impact",{"":"—",1:"1 منخفض",2:"2 متوسط",3:"3 مرتفع"},it.impact||""),"risk-f")
+    + field("f_mitigation","خطة المعالجة",inp("f_mitigation",it.mitigation),"full risk-f")
+    + srcFields(it);
+  openDialog(id ? "تعديل عنصر" : "عنصر جديد", body, async fd => {
+    const patch={}; ["type","stage","title","detail","evidence","status","condition","owner","due","mitigation","source","sourceDate","sourceRef"].forEach(k=>patch[k]=g(fd,k));
+    patch.likelihood = num(g(fd,"likelihood"))||null; patch.impact = num(g(fd,"impact"))||null;
+    if(!patch.title){ $("#dlgErr").textContent="العنوان مطلوب."; return false; }
+    if(patch.evidence==="conditional" && !patch.condition){ $("#dlgErr").textContent="التقدير المشروط يحتاج إلى كتابة الشرط."; return false; }
+    if(!id){
+      if(!canEdit()) return false;
+      const by=await who();
+      try { await S.db.collection("items").add({...patch, createdAt:Date.now(), updatedAt:Date.now(), ...(by?{by, updatedBy:by}:{})}); }
+      catch(e){ toast(e&&e.code==="quota_exceeded"?"امتلأت قاعدة البيانات":"تعذر الحفظ"); return false; }
+      await addLog({entity:"item",field:"",text:`أُضيف ${TYPES[patch.type].l}: ${patch.title}`});
+    } else {
+      const ok = await writeDoc("items/"+id, true, patch); if(!ok) return false;
+      if(patch.status!==(it.status||"")) await addLog({entity:"item",ref:id,itype:patch.type,field:"status",from:it.status||"",to:patch.status,text:`${TYPES[patch.type].l}: ${patch.title}`});
+    }
+    toast("حُفظ");
+  }, id ? async ()=>{ try { await S.db.doc("items/"+id).delete(); await addLog({entity:"item",text:`حُذف: ${it.title}`}); toast("حُذف"); } catch { toast("تعذر الحذف"); } } : null);
+  const syncType = () => {
+    const tt=$("#f_type").value, stSel=$("#f_status"), cur = stSel.value || it.status;
+    stSel.innerHTML = Object.entries(TYPES[tt].st).map(([k,l])=>`<option value="${k}" ${k===cur?"selected":""}>${l}</option>`).join("");
+    form.querySelectorAll(".risk-f").forEach(e=>e.hidden = tt!=="risk");
+    form.querySelectorAll(".cond-f").forEach(e=>e.hidden = $("#f_evidence").value!=="conditional");
+  };
+  $("#f_type").addEventListener("change", syncType); $("#f_evidence").addEventListener("change", syncType); syncType();
+  if(!canEdit()) form.querySelectorAll("select").forEach(e=>e.disabled=true);
+}
+function editProject(){
+  const m=S.meta;
+  const body = field("f_name","اسم المشروع / المسح",inp("f_name",m.name),"full")
+    + field("f_partners","الشركاء (JV)",inp("f_partners",m.partners))
+    + field("f_contractor","مقاول المعالجة",inp("f_contractor",m.contractor))
+    + field("f_baselineLabel","اسم خط الأساس",inp("f_baselineLabel",m.baselineLabel,"text",'placeholder="مثال: Baseline v1 — معتمد في اجتماع يناير"'),"full")
+    + field("f_reviewDate","تاريخ المراجعة الحالية",inp("f_reviewDate",m.reviewDate,"date"))
+    + field("f_lastMeeting","تاريخ الاجتماع السابق",inp("f_lastMeeting",m.lastMeeting,"date"))
+    + field("f_nextMeeting","اجتماع JV القادم",inp("f_nextMeeting",m.nextMeeting,"date"));
+  openDialog("إعدادات المشروع", body, async fd => {
+    const patch={}; ["name","partners","contractor","baselineLabel","reviewDate","lastMeeting","nextMeeting"].forEach(k=>patch[k]=g(fd,k));
+    const ok = await writeDoc("meta/project", S.loaded.meta && Object.keys(S.meta).length>0, patch);
+    if(ok){ if(patch.lastMeeting) S.since=patch.lastMeeting; toast("حُفظ"); }
+  });
+}
+
+/* ---------------- events ---------------- */
+document.addEventListener("click", e => {
+  const a = e.target.closest("[data-act]");
+  if(a){
+    const act=a.dataset.act;
+    if(a.closest("summary") && a.tagName!=="BUTTON") return;
+    e.preventDefault();
+    const [k,...rest]=act.split(":"); const v=rest.join(":");
+    if(k==="stage") editStage(v);
+    else if(k==="qc") editQC(v);
+    else if(k==="item") editItem(v);
+    else if(k==="new") editItem(null,{stage:v,type:"gap"});
+    else if(k==="new-type") editItem(null,{type:v});
+    else if(k==="new-finding") editItem(null,{type:"finding",evidence:"unconfirmed"});
+    else if(k==="go") location.hash=v;
+    else if(k==="demo-on") setDemo(true);
+    else if(k==="demo-off") setDemo(false);
+    return;
+  }
+  const fl = e.target.closest("[data-filter-stage]");
+  if(fl){ S.filter.stage=fl.dataset.filterStage; S.filter.type=""; S.filter.status="open"; }
+});
+document.addEventListener("keydown", e => { if((e.key==="Enter"||e.key===" ") && e.target.matches("[data-act][tabindex]")){ e.preventDefault(); e.target.click(); } });
+document.addEventListener("toggle", e => { const d=e.target; if(d.matches && d.matches("details.stage")){ d.open?sessionOpen.add(d.dataset.stage):sessionOpen.delete(d.dataset.stage); } }, true);
+document.addEventListener("change", async e => {
+  const t=e.target;
+  if(t.id==="sinceIn"||t.id==="sinceIn2"){ S.since=t.value; t.blur(); renderAll(); return; }
+  if(["fStage","fType","fStatus"].includes(t.id)){ S.filter[{fStage:"stage",fType:"type",fStatus:"status"}[t.id]]=t.value; t.blur(); renderAll(); return; }
+  const q=t.closest("[data-stage-quick]");
+  if(q && t.dataset.f){
+    const key=q.dataset.stageQuick, f=t.dataset.f; let v=t.value;
+    if(f==="actualPct") v=clamp(num(v),0,100);
+    const patch={[f]:v};
+    if(f==="status" && v==="done"){ patch.actualPct=100; if(!stage(key).actualEnd) patch.actualEnd=todayISO(); }
+    if(f==="actualPct" && v>0 && stage(key).status==="not_started"){ patch.status="in_progress"; if(!stage(key).fcStart) patch.fcStart=todayISO(); }
+    t.blur(); await saveStage(key, patch); return;
+  }
+  if(t.dataset.check){
+    const [key,i]=t.dataset.check.split(":"); const cur=S.reviews[key];
+    const checks={...(cur?.checks||{}), [i]:t.checked};
+    t.blur(); await writeDoc("reviews/"+key, !!cur, {checks, reviewDate:todayISO()});
+    return;
+  }
+  if(t.dataset.verdict){
+    const key=t.dataset.verdict, cur=S.reviews[key], from=cur?.verdict||"pending";
+    t.blur(); const ok=await writeDoc("reviews/"+key, !!cur, {verdict:t.value, reviewDate:todayISO()});
+    if(ok){ await addLog({entity:"review",ref:key,field:"verdict",from,to:t.value,text:`حكم مراجعة ${SKEY[key].name}`}); toast("حُفظ"); }
+  }
+});
+let qTimer; document.addEventListener("input", e => { if(e.target.id==="fQ"){ clearTimeout(qTimer); const v=e.target.value; qTimer=setTimeout(()=>{ S.filter.q=v; const pos=e.target.selectionStart; e.target.blur(); renderAll(); const n=$("#fQ"); if(n){ n.focus(); try{n.setSelectionRange(pos,pos);}catch{} } }, 350); } });
+window.addEventListener("hashchange", ()=>{ renderAll(); window.scrollTo({top:0}); });
+$("#bMeeting").onclick = () => { S.meeting=!S.meeting; try{ localStorage.setItem("fwi-meeting", S.meeting?"1":"0"); }catch{} renderAll(); };
+$("#bProject").onclick = editProject;
+$("#bAdd").onclick = () => editItem(null,{type:"finding"});
+try { S.meeting = localStorage.getItem("fwi-meeting")==="1"; } catch {}
+
+/* ---------------- boot ---------------- */
+function setSync(cls, text){ const el=$("#sync"); el.className="sync "+cls; $("#synct").textContent=text; }
+renderAll();
+
+(async () => {
+  const c = window.claude;
+  let db=null, user=null;
+  try { [db, user] = await Promise.all([c?.use ? c.use("db") : null, c?.use ? c.use("user") : null]); } catch {}
+  S.db=db; S.user=user; S.dbChecked=true;
+  if(!db){ setSync("err","غير متصل — عرض فقط"); Object.keys(S.loaded).forEach(k=>S.loaded[k]=true); renderAll(); return; }
+  let canW = null; try { canW = user ? await user.can("data.write") : null; } catch {}
+  S.canWrite = canW !== false; S.readOnly = canW === false;
+  setSync("","جارٍ التحميل…");
+  const timer = setTimeout(()=>{ S.slow=true; setSync("warn","البيانات لم تصل بعد"); renderBanners(); }, 10000);
+  let confirmed=0;
+  const done = (k, snap) => { if(!snap.metadata.fromCache && !S.loaded[k]){ S.loaded[k]=true; confirmed++; } if(Object.values(S.loaded).every(Boolean)){ clearTimeout(timer); S.slow=false; setSync("live","متزامن مباشرة"); } };
+  const fail = () => { clearTimeout(timer); setSync("err","انقطع الاتصال بالبيانات"); };
+  const into = (k) => snap => { const o={}; snap.docs.forEach(d=>o[d.id]=d.data()); if(S.demo) REAL[k]=o; else S[k]=o; done(k,snap); renderAll(); };
+  db.doc("meta/project").onSnapshot(snap => { const v=snap.exists?snap.data():{}; if(S.demo) REAL.meta=v; else { S.meta=v; if(!S.since) S.since=v.lastMeeting||""; } done("meta",snap); renderAll(); }, fail);
+  db.collection("stages").onSnapshot(into("stages"), fail);
+  db.collection("qc").onSnapshot(into("qc"), fail);
+  db.collection("reviews").onSnapshot(into("reviews"), fail);
+  db.collection("items").onSnapshot(into("items"), fail);
+  db.collection("log").orderBy("at","desc").limit(400).onSnapshot(snap => { const arr=snap.docs.map(d=>({id:d.id,...d.data()})); if(S.demo) REAL.log=arr; else S.log=arr; done("log",snap); renderAll(); }, fail);
+})();
+})();
+</script>
